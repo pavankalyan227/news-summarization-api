@@ -8,10 +8,28 @@ import os
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 analyzer = SentimentIntensityAnalyzer()
-
 def analyze_sentiment(text):
-    score = analyzer.polarity_scores(text)["compound"]
-    return "Positive" if score > 0.05 else "Negative" if score < -0.05 else "Neutral"
+    # VADER Sentiment
+    analyzer = SentimentIntensityAnalyzer()
+    vader_score = analyzer.polarity_scores(text)['compound']
+
+    # TextBlob Sentiment
+    textblob_score = TextBlob(text).sentiment.polarity
+
+    # Averaging both scores for better accuracy
+    final_score = (vader_score + textblob_score) / 2  
+
+    # Define sentiment categories
+    if final_score >= 0.5:
+        return "Very Positive"
+    elif final_score >= 0.1:
+        return "Positive"
+    elif final_score <= -0.5:
+        return "Very Negative"
+    elif final_score <= -0.1:
+        return "Negative"
+    else:
+        return "Neutral"
 
 # Function to fetch news articles using Google News RSS
 def get_news_articles(company_name):
@@ -45,11 +63,10 @@ def get_news_articles(company_name):
 def text_to_speech(text, filename="summary.mp3"):
     if not text.strip():
         return None  # Prevent empty speech files
-    
-    tts = gTTS(text=text, lang="hi")
+
+    tts = gTTS(text=text, lang="en")  # Change lang="hi" for Hindi
     filepath = os.path.join("data", filename)
-    
-    # Ensure "data" folder exists
+
     if not os.path.exists("data"):
         os.makedirs("data")
 
