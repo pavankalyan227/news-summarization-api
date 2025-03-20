@@ -6,10 +6,11 @@ import time
 from gtts import gTTS
 import base64
 from io import BytesIO
-from googletrans import Translator  # Import Translator for translation
+from googletrans import Translator
 
-# API URL (Deployed on Render)
+# API URLs
 API_URL = "https://news-summarization-api.onrender.com/news/"
+COMPARE_SENTIMENT_URL = "https://news-summarization-api.onrender.com/compare_sentiment"
 
 # Available companies with icons
 COMPANIES = {
@@ -63,7 +64,7 @@ if st.button("🚀 Fetch News"):
     for company in selected_companies:
         try:
             response = requests.get(API_URL + company)
-            response.raise_for_status()  # Raise error if request fails
+            response.raise_for_status()
             data = response.json()
 
             if "Articles" in data and data["Articles"]:
@@ -92,38 +93,50 @@ if st.button("🚀 Fetch News"):
 
                     st.markdown("---")
 
+                # **🔍 Extracted Topics**
+                st.subheader(f"🔍 Extracted Topics for {company}")
+
+# Ensure "Topics" is in response and not empty
+                topics = data.get("Topics", [])
+                if topics:
+                    st.write(", ".join(topics))
+                
+
+
+
                 # Store sentiment distribution
-                sentiment_counts = pd.Series(sentiments).value_counts()
+                sentiment_counts = pd.Series(sentiments).value_counts().sort_index()
                 all_sentiments[company] = sentiment_counts
 
-                # Sentiment Visualization (Single Company)
-                st.subheader(f"📊 Sentiment Distribution for {company}")
+                # **📊 Sentiment Visualization for Single Company**
+                if not sentiment_counts.empty:
+                    st.subheader(f"📊 Sentiment Distribution for {company}")
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    fig, ax = plt.subplots()
-                    ax.pie(
-                        sentiment_counts, 
-                        labels=sentiment_counts.index, 
-                        autopct='%1.1f%%',
-                        colors=['green', 'blue', 'gray', 'orange', 'red']
-                    )
-                    ax.axis("equal")
-                    st.pyplot(fig)
+                    col1, col2 = st.columns(2)
 
-                with col2:
-                    st.bar_chart(sentiment_counts)
+                    with col1:
+                        st.bar_chart(sentiment_counts)  # 📊 Bar Chart
 
-            else:
-                st.warning(f"⚠️ No news found for {company}.")
+                    with col2:
+                        fig, ax = plt.subplots(figsize=(5, 5))
+                        sentiment_counts.plot(kind="pie", autopct='%1.1f%%', ax=ax)
+                        ax.set_ylabel("")  
+                        ax.axis("equal")  
+                        st.pyplot(fig)  # 🥧 Pie Chart
+
+            
 
         except requests.exceptions.RequestException as e:
             st.error(f"❌ Failed to fetch news for {company}. API Error: {e}")
 
-    # Comparative Sentiment Visualization
-    if all_sentiments:
-        st.subheader("📊 Comparative Sentiment Analysis")
+    # **📊 Sentiment Comparison for Multiple Companies**
+    if len(selected_companies) > 1 and all_sentiments:
+        st.subheader("📊 Comparative Sentiment Analysis Across Companies")
 
         sentiment_df = pd.DataFrame(all_sentiments).fillna(0)
-        sentiment_df.plot(kind="bar", figsize=(10, 5), colormap="coolwarm")
-        st.pyplot(plt)
+        st.bar_chart(sentiment_df)  # 📊 Bar Chart
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sentiment_df.sum(axis=1).plot(kind="pie", labels=sentiment_df.index, autopct='%1.1f%%', ax=ax)
+        ax.set_ylabel("")
+        ax.axis("equal")
+        st.pyplot(fig)
