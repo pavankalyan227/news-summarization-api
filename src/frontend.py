@@ -6,13 +6,13 @@ import time
 from gtts import gTTS
 import base64
 from io import BytesIO
-from googletrans import Translator
+from deep_translator import GoogleTranslator  # ✅ Fixed Translator
 
-# API URLs
-API_URL = "https://news-summarization-api.onrender.com/news/"
+# ✅ API URLs
+API_URL = "https://news-summarization-api.onrender.com/news"
 COMPARE_SENTIMENT_URL = "https://news-summarization-api.onrender.com/compare_sentiment"
 
-# Available companies with icons
+# ✅ Available Companies
 COMPANIES = {
     "Apple": "🍏",
     "Microsoft": "💻",
@@ -21,122 +21,115 @@ COMPANIES = {
     "Tesla": "🚗"
 }
 
-# Streamlit UI Configuration
+# ✅ Streamlit UI Config
 st.set_page_config(page_title="News Analysis", page_icon="📰", layout="wide")
 
-# Title with styling
-st.markdown(
-    "<h1 style='text-align: center; color: #0077cc;'>📰 News Summarization & Sentiment Analysis</h1>",
-    unsafe_allow_html=True
-)
+# ✅ Title & Selection
+st.markdown("<h1 style='text-align: center; color: #0077cc;'>📰 News Summarization & Sentiment Analysis</h1>", unsafe_allow_html=True)
 st.write("### Select companies to fetch and compare sentiment analysis.")
-
-# Multi-selection dropdown for companies
 selected_companies = st.multiselect("🔎 Choose companies:", list(COMPANIES.keys()), default=["Apple"])
 
-# Function to Convert Text to Speech in Hindi
+# ✅ Function: Convert Text to Speech (Hindi)
 def text_to_speech(text):
+    """Converts English text to Hindi and generates speech."""
     try:
-        translator = Translator()
-        translated_text = translator.translate(text, src='en', dest='hi').text  # Translate to Hindi
-        tts = gTTS(translated_text, lang='hi')  # Convert to Hindi speech
+        # ✅ Translate text to Hindi using DeepTranslator
+        translated_text = GoogleTranslator(source='en', target='hi').translate(text)
+        
+        # ✅ Convert to Speech (Add `slow=False`)
+        tts = gTTS(translated_text, lang='hi', slow=False)  
         audio_fp = BytesIO()
         tts.write_to_fp(audio_fp)
         audio_fp.seek(0)
+
         return audio_fp
     except Exception as e:
         st.error(f"⚠️ Error in Text-to-Speech: {e}")
         return None
 
-# Fetch News Button
+
+# ✅ Fetch News & Sentiment Analysis
 if st.button("🚀 Fetch News"):
     st.write(f"Fetching news for **{', '.join(selected_companies)}**...")
 
-    # Show progress bar
+    # ✅ Show Progress Bar
     progress_bar = st.progress(0)
     for percent in range(0, 101, 20):
         time.sleep(0.2)
         progress_bar.progress(percent)
 
-    all_sentiments = {}  # Store sentiment distributions
-
-    # Fetch data for each selected company
+    # ✅ API Request
+    all_sentiments = {}
     for company in selected_companies:
         try:
-            response = requests.get(API_URL + company)
+            response = requests.get(f"{API_URL}/{company}")
             response.raise_for_status()
             data = response.json()
 
+            # ✅ Display News
             if "Articles" in data and data["Articles"]:
+                st.subheader(f"📢 News for {company}")
                 sentiments = []
 
                 for article in data["Articles"]:
-                    st.subheader(f"{company} - {article['Title']}")
-                    st.write(f"📝 **Summary:** {article['Summary']}")
+                    st.write(f"**{article['Title']}**")
+                    st.write(f"📜 {article['Summary']}")
                     sentiment = article["Sentiment"]
                     sentiments.append(sentiment)
+                    st.write(f"🟢 Sentiment: **{sentiment}**")
 
-                    sentiment_color_map = {
-                        "Very Positive": "✅",
-                        "Positive": "🙂",
-                        "Neutral": "😐",
-                        "Negative": "⚠️",
-                        "Very Negative": "❌"
-                    }
-                    st.write(f"{sentiment_color_map.get(sentiment, '❓')} **Sentiment: {sentiment}**")
-
-                    # Add Text-to-Speech Option
+                    # ✅ Text-to-Speech
+                    # ✅ Text-to-Speech Debugging
                     audio_fp = text_to_speech(article["Summary"])
                     if audio_fp:
-                        audio_base64 = base64.b64encode(audio_fp.read()).decode("utf-8")
-                        st.audio(f"data:audio/mp3;base64,{audio_base64}", format="audio/mp3")
+                        audio_bytes = audio_fp.read()
+    
+                        # Debugging: Save file locally to verify
+                        with open("test_audio.mp3", "wb") as f:
+                             f.write(audio_bytes)
+    
+                        audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+
+                        
+
+                        # ✅ Play Audio
+                        st.audio(audio_bytes, format="audio/mp3")
+
+                    else:
+                        st.warning(f"⚠️ Failed to generate TTS for: {article['Title']}")
+
 
                     st.markdown("---")
 
-                # **🔍 Extracted Topics**
+                # ✅ Extracted Topics
                 st.subheader(f"🔍 Extracted Topics for {company}")
+                if "Topics" in data and data["Topics"]:
+                    st.write(", ".join(data["Topics"]))
+                else:
+                    st.warning("⚠️ No topics found.")
 
-# Ensure "Topics" is in response and not empty
-                topics = data.get("Topics", [])
-                if topics:
-                    st.write(", ".join(topics))
-                
-
-
-
-                # Store sentiment distribution
-                sentiment_counts = pd.Series(sentiments).value_counts().sort_index()
+                # ✅ Sentiment Distribution (Single Company)
+                sentiment_counts = pd.Series(sentiments).value_counts()
                 all_sentiments[company] = sentiment_counts
+                st.subheader(f"📊 Sentiment Distribution for {company}")
+                
+                fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+                sentiment_counts.plot(kind="bar", ax=ax[0], color="skyblue", edgecolor="black")
+                ax[0].set_title("Bar Chart")
+                sentiment_counts.plot(kind="pie", ax=ax[1], autopct='%1.1f%%', startangle=90, colors=['green', 'blue', 'gray', 'orange', 'red'])
+                ax[1].set_ylabel("")
+                ax[1].set_title("Pie Chart")
+                st.pyplot(fig)
 
-                # **📊 Sentiment Visualization for Single Company**
-                if not sentiment_counts.empty:
-                    st.subheader(f"📊 Sentiment Distribution for {company}")
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.bar_chart(sentiment_counts)  # 📊 Bar Chart
-
-                    with col2:
-                        fig, ax = plt.subplots(figsize=(5, 5))
-                        sentiment_counts.plot(kind="pie", autopct='%1.1f%%', ax=ax)
-                        ax.set_ylabel("")  
-                        ax.axis("equal")  
-                        st.pyplot(fig)  # 🥧 Pie Chart
-
-            
+            else:
+                st.warning(f"⚠️ No news found for {company}.")
 
         except requests.exceptions.RequestException as e:
             st.error(f"❌ Failed to fetch news for {company}. API Error: {e}")
 
-    # **📊 Sentiment Comparison for Multiple Companies**
-    if len(selected_companies) > 1 and all_sentiments:
-        st.subheader("📊 Comparative Sentiment Analysis Across Companies")
-
+    # ✅ Comparative Sentiment Analysis (Multiple Companies)
+    if len(selected_companies) > 1:
+        st.subheader("📊 Comparative Sentiment Analysis")
         sentiment_df = pd.DataFrame(all_sentiments).fillna(0)
-        st.bar_chart(sentiment_df)  # 📊 Bar Chart
-        fig, ax = plt.subplots(figsize=(6, 6))
-        sentiment_df.sum(axis=1).plot(kind="pie", labels=sentiment_df.index, autopct='%1.1f%%', ax=ax)
-        ax.set_ylabel("")
-        ax.axis("equal")
-        st.pyplot(fig)
+        sentiment_df.plot(kind="bar", figsize=(10, 5), colormap="coolwarm")
+        st.pyplot(plt)
